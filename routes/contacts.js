@@ -2,13 +2,28 @@ const express = require('express');
 
 const router = express.Router();
 
+const Contact=require('../modal/contact')
+const auth=require('../middleware/auth')
+
+const { check, validationResult } = require('express-validator');
+
 
   //@route GET '/api/contacts'
   //@desc  Get all User Contact
   //@access public
-router.get('/', (req, res) => {
+router.get('/', auth,async(req, res) => {
+
+  try {
+    const contact=await Contact.find({user:req.user.id}).sort({date:-1})
+
+     res.json(contact);
+    
+  } catch (error) {
+    console.log(error)
+    return res.status(500).json({msg:'Server error'});
+  }
   
-    res.send('Get all Contact User');
+   // res.send('Get all Contact User');
   });
 
 
@@ -16,9 +31,37 @@ router.get('/', (req, res) => {
   //@desc    Add New Contact
   //@access  public
 
-  router.post('/', (req, res) => {
-  
-    res.send('Add new Contact');
+  router.post('/', auth,[
+    check('name','Please enter name').not().isEmpty(),
+    check('email','Please enter valid email').isEmail(),
+    check('phone','Minimum 10 length').isLength({min:10,max:12})
+  ],async(req, res) => {
+
+    const err=validationResult(req)
+  if(!err.isEmpty()){
+    return res.status(402).json({err:err.array()});
+  }
+
+  const {name,email,phone,type}=req.body;
+
+  try {
+    const newcontact=new Contact({
+      name,
+      phone,
+      email,
+      type,
+      user:req.user.id
+    })
+
+    const contact=await newcontact.save();
+
+     res.json(contact);
+    
+  } catch (error) {
+    console.log(error.message)
+    return res.status(500).json({msg:'Server Error'});
+  }
+    //res.send('Add new Contact');
   });
 
   
