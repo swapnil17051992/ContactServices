@@ -1,85 +1,90 @@
-const express = require('express');
+/** @format */
+
+const express = require("express");
 
 const router = express.Router();
 
-const jwt=require('jsonwebtoken')
-const config=require('config')
-const User=require('../modal/user')
-  const bccrypt=require('bcryptjs')
-  const { check, validationResult } = require('express-validator');
+const jwt = require("jsonwebtoken");
+const config = require("config");
+const User = require("../modal/user");
+const bccrypt = require("bcryptjs");
+const { check, validationResult } = require("express-validator");
 
-  const Auth=require('../middleware/auth')
+const Auth = require("../middleware/auth");
 
-  //@route    GET '/api/auth'
-  //@desc     get logged in user
-  //@access   private
+//@route    GET '/api/auth'
+//@desc     get logged in user
+//@access   private
 
-  router.get('/', Auth, async (req, res) => {
-    try {
-      console.log(req.user.id)
-      //find user by ID given by token
-     // console.log(req)
-      const user=await User.findById(req.user.id).select('-password')
-      res.json(user);
-    } catch (error) {
-      console.log(error.message)
-      return  res.json(500).json({msg:'server error'});
-    }
-    //res.send('Get logged in user');
-  });
+router.get("/", Auth, async (req, res) => {
+	try {
+		//console.log(req.user.id)
+		//find user by ID given by token
+		// console.log(req)
+		const user = await User.findById(req.user.id).select("-password");
+		res.json(user);
+	} catch (error) {
+		console.log(error.message);
+		return res.json(500).json({ msg: "server error" });
+	}
+	//res.send('Get logged in user');
+});
 
+//@route    POST '/api/auth'
+//@desc     get logged in user
+//@access   private
 
-  
-  //@route    POST '/api/auth'
-  //@desc     get logged in user
-  //@access   private
+router.post(
+	"/",
+	[
+		check("email", "Please Enter Email").isEmail(),
+		check("password", "Please enter password").not().isEmpty(),
+	],
+	async (req, res) => {
+		const err = validationResult(req);
 
-  router.post('/',[
-check('email','Please Enter Email').isEmail(),
-check('password','Please enter password').not().isEmpty()
-  ] ,async (req, res) => {
+		if (!err.isEmpty()) {
+			return res.status(400).json({ err: err.array() });
+		}
 
-    const err=validationResult(req)
+		const { email, password } = req.body;
 
-    if(!err.isEmpty()){
-      return res.status(400).json({err:err.array()});
-    }
+		try {
+			let user = await User.findOne({ email });
+			if (!user) {
+				return res.status(400).json({ msg: "Invalid Credentials" });
+			}
 
-    const {email,password}=req.body;
+			let match = await bccrypt.compare(password, user.password);
+			if (!match) {
+				return res.status(400).json({ msg: "Invalid password" });
+			}
 
-    try {
-      let user=await User.findOne({email});
-      if(!user){
-        return res.status(400).json({msg:'Invalid Credentials'});
-      }
+			let payload = {
+				user: {
+					id: user.id,
+				},
+			};
 
-      let match=await bccrypt.compare(password,user.password)
-      if(!match)
-      {
-        return res.status(400).json({msg:'Invalid password'});
-      }
+			jwt.sign(
+				payload,
+				config.get("jwtSecret"),
+				{
+					expiresIn: 360000,
+				},
+				(err, token) => {
+					if (err) throw err;
 
-      let payload={
-        user:{
-          id:user.id
-        }
-      }
+					res.json({ token });
+				}
+			);
+		} catch (error) {
+			console.log(error);
+			return res.status(500).json({ msg: "Server Error" });
+		}
 
-      jwt.sign(payload,config.get('jwtSecret'),{
-        expiresIn:360000
-      },(err,token)=>{
-        if(err) throw err;
+		// res.send('Log in user');
+	}
+);
 
-         res.json({token});
-      }) 
-
-    } catch (error) {
-      console.log(error)
-        return res.status(500).json({msg:'Server Error'});
-    }
-
-   // res.send('Log in user');
-  });
-
-
-  module.exports=router;
+module.exports = router;
