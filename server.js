@@ -35,11 +35,6 @@ app.all("/*", function (req, res, next) {
 	}
 });
 
-app.get("/", (req, res) => {
-	//res.send('Wel come stating API');
-	res.json({ msg: "Wel Come to API" });
-});
-
 const usercontroller = require("./routes/users");
 const contactController = require("./routes/contacts");
 app.use("/api/users", usercontroller);
